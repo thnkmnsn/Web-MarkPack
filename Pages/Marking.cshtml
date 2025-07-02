@@ -1,0 +1,156 @@
+﻿@page
+@model MarkPackReport.Pages.MarkingModel
+@{
+    ViewData["Title"] = "Marking";
+}
+@section Scripts
+{
+
+    <!-- DownloadExcel -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script>
+        document.getElementById("downloadExcel").addEventListener("click", function () {
+            const table = document.querySelector("table"); // สมมุติใช้ตารางแรก
+            const workbook = XLSX.utils.table_to_book(table, { sheet: "Marking_Data" });
+            XLSX.writeFile(workbook, "MarkingData.xlsx");
+        });
+    </script>
+    <!--End DownloadExcel -->
+    <script>
+        function cleardata() {
+            document.getElementById("Date").value = "";
+            document.getElementById("Search").value = "";
+            document.getElementById("ProductName").value = "";
+
+            // submit ฟอร์มเดียว หลังจากล้างข้อมูล
+            document.querySelector("form").submit();
+        }
+    </script>
+    <script>
+        document.getElementById("ProductName").addEventListener("input", function () {
+            const query = this.value;
+
+            if (query.length >= 1) {
+                fetch(`/Marking?handler=SearchProductName&term=${encodeURIComponent(query)}`)
+                    .then(res => res.json())
+                    .then(data => {
+                        let html = "";
+                        if (data.length === 0) {
+                            html = "<div class='item'>No results</div>";
+                        } else {
+                            data.forEach(item => {
+                                html += `<div class='item' onclick="selectProduct('${item.productName}')">${item.productName}</div>`;
+                            });
+                        }
+                        document.getElementById("suggestions").innerHTML = html;
+                        document.getElementById("suggestions").style.display = "block";
+                    });
+            } else {
+                document.getElementById("suggestions").style.display = "none";
+            }
+        });
+
+        function selectProduct(name) {
+            document.getElementById("ProductName").value = name;
+            document.getElementById("suggestions").style.display = "none";
+        }
+    </script>
+}
+<style>
+    .suggestion-box {
+        position: absolute;
+        top: 100%; /* อยู่ใต้ input พอดี */
+        left: 0;
+        right: 0;
+        border: 1px solid #ccc;
+        background-color: #fff;
+        z-index: 1000;
+        max-height: 200px;
+        overflow-y: auto;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+
+        .suggestion-box .item {
+            padding: 8px 10px;
+            cursor: pointer;
+        }
+
+            .suggestion-box .item:hover {
+                background-color: #f0f0f0;
+            }
+</style>
+
+<div style="text-align: center; padding-top: 30px;">
+    <h1 style="font-family: Comic Sans MS; color: #33aaff;">Marking Process</h1>
+</div>
+
+<form method="get" style="text-align:center; margin-bottom:20px;">
+
+    <label style="font-weight: bold; font-size: 18px;">Date :</label>
+    <input type="date" id="Date" name="Date" value="@Model.Date" />
+
+    <label for="SearchMFG" style="font-weight:bold; font-size:18px;">MFGNo.</label>
+    <input id="Search" name="Search" type="text" value="@Model.Search" style="width:120px; padding:5px; border-radius:5px;" />
+
+    <label style="font-weight: bold; font-size: 18px;">ProductName :</label>
+    <div style="position: relative; display: inline-block;">
+        <input type="text" id="ProductName" name="ProductName" autocomplete="off" value="@Model.ProductName"/>
+        <div id="suggestions" class="suggestion-box"></div>
+    </div>
+    <button type="submit" style="margin-left:10px; font-weight:bold; font-family:Comic Sans MS;">
+        Search
+        <img src="/images/search.png" alt="Search" width="25" />
+    </button>
+
+    <button type="button" style="margin-left:10px; font-weight:bold; font-family:Comic Sans MS;" onclick="cleardata()">
+        Clear
+        <img src="/images/clear.png" alt="clear" width="25" />
+    </button>
+
+</form>
+
+<div style="text-align: right; margin: 20px 50px;">
+    <button id="downloadExcel" style="background-color: lightgray; padding: 10px; border-radius: 10px; font-family: Comic Sans MS; border: none; cursor: pointer;">
+        <img src="/images/excel.png" width="30" style="vertical-align: middle;" />
+        <span style="color: green; font-weight: bold;">Download</span>
+    </button>
+</div>
+
+<style>
+    /* ซ่อนคอลัมน์ Created Date ในหน้าเว็บ */
+    .col-created-date {
+        display: none;
+    }
+</style>
+
+
+<table style="width: 95%; margin: auto; border-collapse: collapse; font-family: Comic Sans MS;">
+    <thead>
+        <tr style="background-color: #e0e0e0;">
+            <th style="border: 1px solid #aaa; padding: 8px;">MFG</th>
+            <th style="border: 1px solid #aaa; padding: 8px;">ProductName</th>
+            <th style="border: 1px solid #aaa; padding: 8px;">Qty</th>
+            <th class="col-created-date" style="border: 1px solid #aaa; padding: 8px;">Created Date</th>
+        </tr>
+    </thead>
+    <tbody>
+        @if (Model.AppBoxMarkingTracking != null && Model.AppBoxMarkingTracking.Any())
+        {
+            foreach (var item in Model.AppBoxMarkingTracking)
+            {
+                <tr>
+                    <td style="border: 1px solid #ccc;">@item.MFG</td>
+                    <td style="border: 1px solid #ccc;">@item.ProductName</td>
+                    <td style="border: 1px solid #ccc; text-align: center;">@item.InputQty</td>
+                    <td class="col-created-date" style="border: 1px solid #ccc;">@item.CreatedDate.ToString("yyyy-MM-dd HH:mm")</td>
+                </tr>
+            }
+        }
+        else
+        {
+            <tr>
+                <td colspan="8" style="text-align:center; color:red;">No data found</td>
+            </tr>
+        }
+    </tbody>
+</table>

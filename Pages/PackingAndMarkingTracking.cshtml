@@ -1,0 +1,62 @@
+﻿@page
+@model MarkPackReport.Pages.PackingAndMarkingTrackingModel
+@{
+    ViewData["Title"] = "PackingAndMarkingTracking";
+}
+<div style="text-align: center; padding-top: 30px;">
+    <h1 style="font-family: Comic Sans MS; color: #33aaff;">Marking Process</h1>
+</div>
+<div style="text-align: right; margin: 20px 50px;">
+    <button id="downloadExcel" style="background-color: lightgray; padding: 10px; border-radius: 10px; font-family: Comic Sans MS; border: none; cursor: pointer;">
+        <img src="/images/excel.png" width="30" style="vertical-align: middle;" />
+        <span style="color: green; font-weight: bold;">Download</span>
+    </button>
+</div>
+
+<style>
+    /* ซ่อนคอลัมน์ Created Date ในหน้าเว็บ */
+    .col-created-date {
+        display: none;
+    }
+</style>
+
+
+<table style="width: 95%; margin: auto; border-collapse: collapse; font-family: Comic Sans MS;">
+    <thead>
+        <tr style="background-color: #e0e0e0;">
+            <th style="border: 1px solid #aaa; padding: 8px;">MFG</th>
+            <th style="border: 1px solid #aaa; padding: 8px;">ProductCode</th>
+            <th style="border: 1px solid #aaa; padding: 8px;">ProductName</th>
+            <th style="border: 1px solid #aaa; padding: 8px;">Qty</th>
+            <th style="border: 1px solid #aaa; padding: 8px;">Actual</th>
+            <th style="border: 1px solid #aaa; padding: 8px;">Remain</th>
+            <th style="border: 1px solid #aaa; padding: 8px;">PackingNo.</th>
+            <th style="border: 1px solid #aaa; padding: 8px;">PackID</th>
+        </tr>
+    </thead>
+    <tbody>
+        @if (Model.viewPackingAndMarkingTrackings != null && Model.viewPackingAndMarkingTrackings.Any())
+        {
+            foreach (var item in Model.viewPackingAndMarkingTrackings)
+            {
+                <tr>
+                    <td style="border: 1px solid #ccc;">@item.MFG</td>
+                    <td style="border: 1px solid #ccc;">@item.ProductCode</td>
+                    <td style="border: 1px solid #ccc;">@item.ProductName</td>
+                    <td style="border: 1px solid #ccc; text-align: center;">@item.TotalInputQty</td>
+                    <td style="border: 1px solid #ccc; text-align: center;">@item.ActualPackQty</td>
+                    <td style="border: 1px solid #ccc; text-align: center;">@item.RemainQty</td>
+                    <td style="border: 1px solid #ccc;">@item.PackingNos</td>
+                    <td style="border: 1px solid #ccc;">@item.PackIDs</td>
+                </tr>
+            }
+        }
+        else
+        {
+            <tr>
+                <td colspan="8" style="text-align:center; color:red;">No data found</td>
+            </tr>
+        }
+    </tbody>
+</table>
+
