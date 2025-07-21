@@ -8,7 +8,6 @@ using System.Threading.Tasks;
 using MarkPackReport.Models;
 using MarkPackReport.Services;
 
-
 namespace MarkPackReport.Pages
 {
     public class MarkingModel : PageModel
@@ -23,7 +22,10 @@ namespace MarkPackReport.Pages
         public string Search { get; set; }
 
         [BindProperty(SupportsGet = true)]
-        public string Date { get; set; }
+        public DateTime? StartDate { get; set; }
+
+        [BindProperty(SupportsGet = true)]
+        public DateTime? EndDate { get; set; }
 
         [BindProperty(SupportsGet = true)]
         public string ProductName { get; set; }
@@ -31,16 +33,18 @@ namespace MarkPackReport.Pages
 
         public async Task OnGetAsync()
         {
-            var query = _service.LoadData(); // returns List<AppBoxMarkingTracking>
+            var query = _service.LoadData(); // สมมุติว่าเป็น List<AppBoxMarkingTracking>
 
             if (!string.IsNullOrEmpty(Search))
             {
                 query = query.Where(x => x.MFG.Contains(Search)).ToList();
             }
 
-            if (!string.IsNullOrEmpty(Date) && DateTime.TryParse(Date, out var parsedDate))
+            if (StartDate.HasValue && EndDate.HasValue)
             {
-                query = query.Where(x => x.CreatedDate.Date == parsedDate.Date).ToList();
+                query = query.Where(x =>
+                    x.CreatedDate.Date >= StartDate.Value.Date &&
+                    x.CreatedDate.Date <= EndDate.Value.Date).ToList();
             }
 
             if (!string.IsNullOrEmpty(ProductName))
@@ -50,6 +54,7 @@ namespace MarkPackReport.Pages
 
             AppBoxMarkingTracking = query;
         }
+
         public JsonResult OnGetSearchProductName(string term)
         {
             var data = _service.LoadData()

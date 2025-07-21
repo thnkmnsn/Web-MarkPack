@@ -23,7 +23,9 @@ namespace MarkPackReport.Models
         public int PackQty { get; set; }
         public decimal NetWeightKg { get; set; }
         public string MFGNo { get; set; }
-        public int ActualPackQty { get; set; }
-        public DateTime OnlyDate { get; set; }
+        public int? ActualPackQty { get; set; }
+        public int? totalActual { get; set; }
+        public DateTime? OnlyDate { get; set; }
+        public int? Remain { get; set; }
     }
 }

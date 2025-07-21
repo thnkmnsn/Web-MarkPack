@@ -28,8 +28,10 @@ namespace MarkPackReport.Services
                     MFG = g.Key.MFG,
                     ProductName = g.Key.ProductName,
                     CreatedDate = g.Key.OnlyDate,
-                    InputQty = g.Sum(x=> x.InputQty)
-                }).ToList();
+                    InputQty = g.Sum(x => x.InputQty)
+                })
+                .OrderByDescending(x => x.CreatedDate) // เรียงวันที่ล่าสุด
+                .ToList();
             return result;
         }
 
@@ -49,7 +51,7 @@ namespace MarkPackReport.Services
                     MFG = g.Key.MFG,
                     ProductCode = g.Key.ProductCode,
                     ProductName = g.Key.ProductName,
-                    InputQty = g.Sum (x=> x.InputQty)
+                    InputQty = g.Sum(x => x.InputQty)
                 }).ToList();
             return result;
         }

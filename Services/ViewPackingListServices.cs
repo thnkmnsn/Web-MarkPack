@@ -8,16 +8,14 @@ namespace MarkPackReport.Services
     public class ViewPackingListServices
     {
         private readonly MyDbContext _context;
-        public ViewPackingListServices(MyDbContext context) 
+        public ViewPackingListServices(MyDbContext context)
         {
             _context = context;
         }
 
-        public List<ViewPackingList> LoadData()
+        public List<ViewPackingList> LoadData() //Edit 2025-07-09 by art
         {
-            DateTime strDate = new DateTime(2025, 6, 27);
-            var result = (from p in _context.ViewPaackingList
-                          where p.OnlyDate >= strDate
+            var result = (from p in _context.ViewPackingList
                           select new ViewPackingList
                           {
                               PackingNo = p.PackingNo,
@@ -29,7 +27,11 @@ namespace MarkPackReport.Services
                               CustomerPO = p.CustomerPO,
                               PackQty = p.PackQty,
                               ActualPackQty = p.ActualPackQty,
-                          }).Take(300)
+                              totalActual = p.totalActual,
+                              OnlyDate = p.OnlyDate,
+                              Remain = p.PackQty - p.totalActual
+                          })
+                          .OrderByDescending(x => x.PackingNo).ThenBy(x => x.PackID)
                           .ToList();
             return result;
         }
@@ -37,7 +39,7 @@ namespace MarkPackReport.Services
         public List<ViewPackingList> GetDataforBalance()
         {
             DateTime strDate = new DateTime(2025, 6, 27);
-            var result = _context.ViewPaackingList
+            var result = _context.ViewPackingList
                 .Where(x => x.MFGNo != null)
                 .GroupBy(x => new
                 {

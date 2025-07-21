@@ -2,53 +2,353 @@
 @model MarkPackReport.Pages.PackingListModel
 @{
     ViewData["Title"] = "PackingList";
-}
-    <div style="text-align: center; padding-top: 30px;">
-        <h1 style="font-family: Comic Sans MS; color: #33aaff;">Marking Process</h1>
-    </div>
-    <div style="text-align: right; margin: 20px 50px;">
-        <button id="downloadExcel" style="background-color: lightgray; padding: 10px; border-radius: 10px; font-family: Comic Sans MS; border: none; cursor: pointer;">
-            <img src="/images/excel.png" width="30" style="vertical-align: middle;" />
-            <span style="color: green; font-weight: bold;">Download</span>
-        </button>
-    </div>
 
-    <style>
-        /* ซ่อนคอลัมน์ Created Date ในหน้าเว็บ */
-        .col-created-date {
-            display: none;
+    <!-- DownloadExcel -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            document.getElementById("downloadExcel").addEventListener("click", function () {
+                const table = document.querySelector("table");
+                const rows = Array.from(table.querySelectorAll("tbody tr"));
+                const headerCells = Array.from(table.querySelectorAll("thead th")).map(th => th.innerText.trim());
+
+                const excelHeaders = headerCells;
+
+                const data = [excelHeaders];
+                const merges = [];
+
+                let currentRowExcelIndex = 1; // Excel row index, starting after header
+
+                rows.forEach((row, rowIndex) => {
+                    const cells = Array.from(row.children);
+                    const currentExcelRowData = [];
+
+                    // Check for rowspan and apply merges
+                    if (cells[0].hasAttribute("rowspan")) {
+                        const rowspan = parseInt(cells[0].getAttribute("rowspan"));
+
+                        // Add merge ranges for the merged columns (CustomerName, PackingNo, Package, ProductName, PlanQty, Remain)
+                        for (let i = 0; i <= 4; i++) { // For the first 5 columns that are merged
+                            merges.push({
+                                s: { r: currentRowExcelIndex, c: i },
+                                e: { r: currentRowExcelIndex + rowspan - 1, c: i }
+                            });
+                        }
+                        // Remain column. Its Excel column index will be 7.
+                        merges.push({
+                            s: { r: currentRowExcelIndex, c: 7 },
+                            e: { r: currentRowExcelIndex + rowspan - 1, c: 7 }
+                        });
+
+                        const mfgNoValue = cells[5].innerText.trim();
+
+                        // Conditionally set Qty and Remain based on mfgNoValue
+                        let qtyValue;
+                        let remainValue;
+
+                        if (mfgNoValue !== "") {
+                            qtyValue = parseInt(cells[6].innerText.trim());
+                            // If parsing results in NaN, set to empty string, otherwise use the parsed number
+                            qtyValue = isNaN(qtyValue) ? "" : qtyValue;
+
+                            remainValue = parseInt(cells[7].innerText.trim());
+                            // If parsing results in NaN, set to empty string, otherwise use the parsed number
+                            remainValue = isNaN(remainValue) ? "" : remainValue;
+                        } else {
+                            qtyValue = "";
+                            remainValue = "";
+                        }
+
+                        // Populate data for the *first* row of a merged group
+                        currentExcelRowData.push(
+                            cells[0].innerText.trim(), // CustomerName
+                            cells[1].innerText.trim(), // PackingNo
+                            cells[2].innerText.trim(), // Package
+                            cells[3].innerText.trim(), // ProductName
+                            parseInt(cells[4].innerText.trim()) || "", // PlanQty
+                            mfgNoValue, // MFGNo
+                            qtyValue, // Qty (conditional)
+                            remainValue, // Remain (conditional)
+                            cells[8].innerText.trim() // Created Date
+                        );
+                    } else {
+                        // For subsequent rows within a merged group,
+                        // fill the merged columns with empty strings.
+                        currentExcelRowData.push("", "", "", "", ""); // CustomerName, PackingNo, Package, ProductName, PlanQty
+
+                        const mfgNoValue = cells[0].innerText.trim();
+                        let qtyValue;
+
+                        if (mfgNoValue !== "") {
+                            qtyValue = parseInt(cells[1].innerText.trim());
+                            qtyValue = isNaN(qtyValue) ? "" : qtyValue;
+                        } else {
+                            qtyValue = "";
+                        }
+
+                        // Then add the non-merged columns (MFGNo, Qty)
+                        currentExcelRowData.push(
+                            mfgNoValue, // MFGNo
+                            qtyValue // Qty (conditional)
+                        );
+                        // Add an empty string for Remain, as it was merged in the first row, or if MFGNo is empty
+                        currentExcelRowData.push(""); // Remain (still empty here because it's merged or MFGNo is empty)
+                        currentExcelRowData.push(cells[2].innerText.trim()); // Created Date
+                    }
+
+                    data.push(currentExcelRowData);
+                    currentRowExcelIndex++; // Increment Excel row index for the next iteration
+                });
+
+                const worksheet = XLSX.utils.aoa_to_sheet(data);
+                worksheet["!merges"] = merges;
+
+                const workbook = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(workbook, worksheet, "Packing_Data");
+
+                const today = new Date();
+                const yyyy = today.getFullYear();
+                const mm = String(today.getMonth() + 1).padStart(2, '0');
+                const dd = String(today.getDate()).padStart(2, '0');
+                const fileName = `PackingList_${yyyy}-${mm}-${dd}.xlsx`;
+
+                XLSX.writeFile(workbook, fileName);
+            });
+        });
+    </script>
+
+    <!--End DownloadExcel -->
+
+    <script>
+        function cleardata() {
+            document.getElementById("PackingNo").value = "";
+            document.getElementById("PackID").value = "";
+            document.getElementById("MFGNo").value = "";
+            document.getElementById("ProductName").value = "";
+
+            // ส่งแบบ form เปล่า ๆ
+            document.forms[0].submit();
         }
-    </style>
+    </script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const productInput = document.getElementById("ProductName");
+            const suggestionBox = document.getElementById("suggestions");
+            const form = document.getElementById("searchForm");
+
+            productInput.addEventListener("input", function () {
+                const query = this.value;
+
+                if (query.length >= 1) {
+                    fetch(`?handler=SearchProductName&term=${encodeURIComponent(query)}`)
+                        .then(res => res.json())
+                        .then(data => {
+                            let html = "";
+
+                            if (data.length === 0) {
+                                html = "<div class='item'>No Product Name</div>";
+                            } else {
+                                data.forEach(item => {
+                                    html += `<div class="item" data-name="${item.productName}">${item.productName}</div>`;
+                                });
+                            }
+
+                            suggestionBox.innerHTML = html;
+                            suggestionBox.style.display = "block";
+                        });
+                } else {
+                    suggestionBox.style.display = "none";
+                }
+            });
+
+            suggestionBox.addEventListener("click", function (e) {
+                if (e.target && e.target.classList.contains("item")) {
+                    const selectedName = e.target.textContent.trim();
+                    productInput.value = selectedName;
+                    suggestionBox.style.display = "none";
+                }
+            });
+
+            // productInput.addEventListener("blur", function () {
+            //     setTimeout(() => {
+            //         suggestionBox.style.display = "none";
+            //     }, 200);
+            // });
+        });
+    </script>
+}
+
+<style>
+    .suggestion-box {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        border: 1px solid #ccc;
+        background-color: #fff;
+        z-index: 1000;
+        max-height: 200px;
+        overflow-y: auto;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+
+        .suggestion-box .item {
+            padding: 8px 10px;
+            cursor: pointer;
+        }
+
+            .suggestion-box .item:hover {
+                background-color: #f0f0f0;
+            }
+</style>
 
 
-    <table style="width: 95%; margin: auto; border-collapse: collapse; font-family: Comic Sans MS;">
-        <thead>
-            <tr style="background-color: #e0e0e0;">
-                <th style="border: 1px solid #aaa; padding: 8px;">MFG</th>
-                <th style="border: 1px solid #aaa; padding: 8px;">ProductName</th>
-                <th style="border: 1px solid #aaa; padding: 8px;">Qty</th>
-                <th class="col-created-date" style="border: 1px solid #aaa; padding: 8px;">Created Date</th>
-            </tr>
-        </thead>
-        <tbody>
-            @if (Model.viewPackingList != null && Model.viewPackingList.Any())
+<div style="text-align: center; padding-top: 30px;">
+    <h1 style="font-family: Comic Sans MS; color: #33aaff;">Packing Entry</h1>
+    <p></p>
+    <form method="get" style="text-align:center; margin-bottom:20px;">
+        <div style="margin-bottom: 10px;">
+            <label style="font-weight:bold; font-size:18px;">PackingNo :</label>
+            <input type="text" id="PackingNo" name="PackingNo" value="@Model.PackingNo" style="width: 120px;" />
+
+            <label style="font-weight: bold; font-size: 18px;">PackID :</label>
+            <input type="text" id="PackID" name="PackID" value="@Model.PackID" style="width: 45px;" />
+
+            <label style="font-weight:bold; font-size:18px;">MFGNo. :</label>
+            <input type="text" id="MFGNo" name="MFGNo" value="@Model.MFGNo" style="width: 95px;" />
+
+            <label style="font-weight: bold; font-size: 18px;">ProductName :</label>
+            <div style="position: relative; display: inline-block;">
+                <input type="text" id="ProductName" name="ProductName" autocomplete="off" style="width: 300px;" value="@Model.ProductName" />
+                <div id="suggestions" class="suggestion-box"></div>
+            </div>
+
+
+            @*<label style="font-weight: bold; font-size: 18px;">ProductName :</label>
+                <input type="text" id="ProductName" name="ProductName" style="width: 300px;" value="@Model.ProductName" />*@
+        </div>
+
+        <!-- ปุ่มจัดชิดขวาให้ตรงกับปุ่มดาวน์โหลด -->
+        <div style="text-align: right; margin: 20px 50px;">
+            <button type="submit" style="margin: 10px; font-weight:bold; font-family:Comic Sans MS; border-radius: 15px; padding: 10px;">
+                Search
+                <img src="/images/search.png" alt="Search" width="25" />
+            </button>
+
+            <button type="button" style="margin-left:10px; font-weight:bold; font-family:Comic Sans MS; border-radius: 15px; padding: 10px;" onclick="cleardata()">
+                Clear
+                <img src="/images/clear.png" alt="clear" width="25" />
+            </button>
+
+        </div>
+    </form>
+</div>
+<div style="text-align: right; margin: 20px 50px;">
+    <button id="downloadExcel" style="background-color: lightgray; padding: 10px; border-radius: 10px; font-family: Comic Sans MS; border: none; cursor: pointer;">
+        <img src="/images/excel.png" width="30" style="vertical-align: middle;" />
+        <span style="color: green; font-weight: bold;">Download</span>
+    </button>
+</div>
+
+<style>
+    /* ซ่อนคอลัมน์ Created Date ในหน้าเว็บ */
+    .col-created-date {
+        display: none;
+    }
+</style>
+
+
+<table style="width: 95%; margin: auto; border-collapse: collapse; font-family: Comic Sans MS;">
+    <thead>
+        <tr style="background-color: #e0e0e0;">
+            <th style="border: 1px solid #aaa; padding: 8px;">CustomerName</th>
+            <th style="border: 1px solid #aaa; padding: 8px;">PackingNo</th>
+            <th style="border: 1px solid #aaa; padding: 8px;">Package</th>
+            <th style="border: 1px solid #aaa; padding: 8px;">ProductName</th>
+            <th style="border: 1px solid #aaa; padding: 8px;">PlanQty</th>
+            <th style="border: 1px solid #aaa; padding: 8px;">MFGNo</th>
+            <th style="border: 1px solid #aaa; padding: 8px;">Qty</th>
+            <th style="border: 1px solid #aaa; padding: 8px;">Remain</th>
+            <th class="col-created-date"  style="border: 1px solid #aaa; padding: 8px;">Created Date</th>
+        </tr>
+    </thead>
+    <tbody>
+        @if (Model.viewPackingList != null && Model.viewPackingList.Any() &&
+                (!string.IsNullOrEmpty(Model.PackingNo) ||
+                !string.IsNullOrEmpty(Model.PackID) ||
+                !string.IsNullOrEmpty(Model.MFGNo) ||
+                !string.IsNullOrEmpty(Model.ProductName)))
+        {
+            var groupedData = Model.viewPackingList
+            .GroupBy(x => new { x.ConsigneeName, x.PackingNo, x.PackID, x.ProductName, x.PackQty })
+            .ToList();
+
+            foreach (var group in groupedData)
             {
-                foreach (var item in Model.viewPackingList)
+                var rowspan = group.Count();
+                var isFirstRow = true;
+
+                @foreach (var item in group)
                 {
                     <tr>
+                        @if (isFirstRow)
+                        {
+                            <td rowspan="@rowspan" style="border: 1px solid #ccc;">@item.ConsigneeName</td>
+                            <td rowspan="@rowspan" style="border: 1px solid #ccc;">@item.PackingNo</td>
+                            <td rowspan="@rowspan" style="border: 1px solid #ccc; text-align: center;">@item.PackID</td>
+                            <td rowspan="@rowspan" style="border: 1px solid #ccc;">@item.ProductName</td>
+                            <td rowspan="@rowspan" style="border: 1px solid #ccc; text-align: center;">@item.PackQty</td>
+                        }
                         <td style="border: 1px solid #ccc;">@item.MFGNo</td>
-                        <td style="border: 1px solid #ccc;">@item.ProductName</td>
                         <td style="border: 1px solid #ccc; text-align: center;">@item.ActualPackQty</td>
-                        <td class="col-created-date" style="border: 1px solid #ccc;">@item.OnlyDate.ToString("yyyy-MM-dd")</td>
+                        @if (isFirstRow)
+                        {
+                            <td rowspan="@rowspan" style="border: 1px solid #ccc; text-align: center;">@item.Remain</td>
+                        }
+
+                        <td class="col-created-date" style="border: 1px solid #ccc; text-align: center;">@item.OnlyDate?.ToString("dd-MM-yyyy")</td>
                     </tr>
+
+                    isFirstRow = false;
                 }
             }
-            else
+        }
+        else if (!string.IsNullOrEmpty(Model.PackingNo) ||
+        !string.IsNullOrEmpty(Model.PackID) ||
+        !string.IsNullOrEmpty(Model.MFGNo) ||
+        !string.IsNullOrEmpty(Model.ProductName))
+        {
+            <tr>
+                <td colspan="9" style="text-align:center; color:red;">No data found</td>
+            </tr>
+        }
+
+
+    </tbody>
+
+</table>
+
+<!-- แสดงโชว์ข้อมูลในตาราง -->
+@*<tbody>
+        @if (Model.viewPackingList != null && Model.viewPackingList.Any())
+        {
+            foreach (var item in Model.viewPackingList)
             {
                 <tr>
-                    <td colspan="8" style="text-align:center; color:red;">No data found</td>
+                    <td style="border: 1px solid #ccc;">@item.ConsigneeName</td>
+                    <td style="border: 1px solid #ccc;">@item.PackingNo</td>
+                    <td style="border: 1px solid #ccc; text-align: center;">@item.PackID</td>
+                    <td style="border: 1px solid #ccc;">@item.ProductName</td>
+                    <td style="border: 1px solid #ccc;">@item.MFGNo</td>
+                    <td style="border: 1px solid #ccc; text-align: center;">@item.ActualPackQty</td>
+                    <td class="col-created-date" style="border: 1px solid #ccc;">@item.OnlyDate.ToString("yyyy-MM-dd")</td>
                 </tr>
             }
-        </tbody>
-    </table>
-
+        }
+        else
+        {
+            <tr>
+                <td colspan="8" style="text-align:center; color:red;">No data found</td>
+            </tr>
+        }
+    </tbody>*@

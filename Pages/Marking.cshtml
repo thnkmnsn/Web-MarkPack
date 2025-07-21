@@ -11,14 +11,52 @@
     <script>
         document.getElementById("downloadExcel").addEventListener("click", function () {
             const table = document.querySelector("table"); // สมมุติใช้ตารางแรก
-            const workbook = XLSX.utils.table_to_book(table, { sheet: "Marking_Data" });
-            XLSX.writeFile(workbook, "MarkingData.xlsx");
+            const worksheet = XLSX.utils.table_to_sheet(table, { raw: true });
+
+            const range = XLSX.utils.decode_range(worksheet['!ref']);
+
+            for (let R = range.s.r + 1; R <= range.e.r; ++R) {
+                // MFGNo (column 0) → string
+                const mfgCell = worksheet[XLSX.utils.encode_cell({ r: R, c: 0 })];
+                if (mfgCell) {
+                    mfgCell.t = 's';
+                    mfgCell.v = mfgCell.v.toString().padStart(6, '0');
+                }
+
+                const productNameCell = worksheet[XLSX.utils.encode_cell({ r: R, c: 1 })];
+                if (productNameCell) {
+                    productNameCell.t = 's';
+                    productNameCell.v = productNameCell.v.toString();
+                }
+
+                // InputQty (column 3) → number
+                const inputQtyCell = worksheet[XLSX.utils.encode_cell({ r: R, c: 2 })];
+                if (inputQtyCell) {
+                    const num = Number(inputQtyCell.v.toString().replace(/,/g, ''));
+                    if (!isNaN(num)) {
+                        inputQtyCell.t = 'n';
+                        inputQtyCell.v = num;
+                    }
+                }
+            }
+
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "Marking_Data");
+
+            const today = new Date();
+            const yyyy = today.getFullYear();
+            const mm = String(today.getMonth() + 1).padStart(2, '0');
+            const dd = String(today.getDate()).padStart(2, '0');
+            const fileName = `Marking_${yyyy}-${mm}-${dd}.xlsx`;
+
+            XLSX.writeFile(workbook, fileName);
         });
     </script>
     <!--End DownloadExcel -->
     <script>
         function cleardata() {
-            document.getElementById("Date").value = "";
+            document.getElementById("StartDate").value = "";
+            document.getElementById("EndDate").value = "";
             document.getElementById("Search").value = "";
             document.getElementById("ProductName").value = "";
 
@@ -26,40 +64,59 @@
             document.querySelector("form").submit();
         }
     </script>
+
     <script>
-        document.getElementById("ProductName").addEventListener("input", function () {
-            const query = this.value;
+        document.addEventListener("DOMContentLoaded", function () {
+            const productInput = document.getElementById("ProductName");
+            const suggestionBox = document.getElementById("suggestions");
+            const form = document.getElementById("searchForm");
 
-            if (query.length >= 1) {
-                fetch(`/Marking?handler=SearchProductName&term=${encodeURIComponent(query)}`)
-                    .then(res => res.json())
-                    .then(data => {
-                        let html = "";
-                        if (data.length === 0) {
-                            html = "<div class='item'>No results</div>";
-                        } else {
-                            data.forEach(item => {
-                                html += `<div class='item' onclick="selectProduct('${item.productName}')">${item.productName}</div>`;
-                            });
-                        }
-                        document.getElementById("suggestions").innerHTML = html;
-                        document.getElementById("suggestions").style.display = "block";
-                    });
-            } else {
-                document.getElementById("suggestions").style.display = "none";
-            }
+            productInput.addEventListener("input", function () {
+                const query = this.value;
+
+                if (query.length >= 1) {
+                    fetch(`?handler=SearchProductName&term=${encodeURIComponent(query)}`)
+                        .then(res => res.json())
+                        .then(data => {
+                            let html = "";
+
+                            if (data.length === 0) {
+                                html = "<div class='item'>No Product Name</div>";
+                            } else {
+                                data.forEach(item => {
+                                    html += `<div class="item" data-name="${item.productName}">${item.productName}</div>`;
+                                });
+                            }
+
+                            suggestionBox.innerHTML = html;
+                            suggestionBox.style.display = "block";
+                        });
+                } else {
+                    suggestionBox.style.display = "none";
+                }
+            });
+
+            suggestionBox.addEventListener("click", function (e) {
+                if (e.target && e.target.classList.contains("item")) {
+                    const selectedName = e.target.textContent.trim();
+                    productInput.value = selectedName;
+                    suggestionBox.style.display = "none";
+                }
+            });
+
+            // productInput.addEventListener("blur", function () {
+            //     setTimeout(() => {
+            //         suggestionBox.style.display = "none";
+            //     }, 200);
+            // });
         });
-
-        function selectProduct(name) {
-            document.getElementById("ProductName").value = name;
-            document.getElementById("suggestions").style.display = "none";
-        }
     </script>
-}
+    }
+
 <style>
     .suggestion-box {
         position: absolute;
-        top: 100%; /* อยู่ใต้ input พอดี */
+        top: 100%;
         left: 0;
         right: 0;
         border: 1px solid #ccc;
@@ -83,30 +140,36 @@
 <div style="text-align: center; padding-top: 30px;">
     <h1 style="font-family: Comic Sans MS; color: #33aaff;">Marking Process</h1>
 </div>
-
+<p></p>
 <form method="get" style="text-align:center; margin-bottom:20px;">
 
-    <label style="font-weight: bold; font-size: 18px;">Date :</label>
-    <input type="date" id="Date" name="Date" value="@Model.Date" />
+    <label style="font-weight: bold; font-size: 18px;">Start Date :</label>
+    <input type="date" id="StartDate" name="StartDate" value="@Model.StartDate?.ToString("yyyy-MM-dd")" />
 
-    <label for="SearchMFG" style="font-weight:bold; font-size:18px;">MFGNo.</label>
-    <input id="Search" name="Search" type="text" value="@Model.Search" style="width:120px; padding:5px; border-radius:5px;" />
+    <label style="font-weight: bold; font-size: 18px;">End Date :</label>
+    <input type="date" id="EndDate" name="EndDate" value="@Model.EndDate?.ToString("yyyy-MM-dd")" />
+
+
+    <label style="font-weight:bold; font-size:18px;">MFGNo.</label>
+    <input type="text" id="Search" name="Search" style="width: 95px;" value="@Model.Search" />
 
     <label style="font-weight: bold; font-size: 18px;">ProductName :</label>
     <div style="position: relative; display: inline-block;">
-        <input type="text" id="ProductName" name="ProductName" autocomplete="off" value="@Model.ProductName"/>
+        <input type="text" id="ProductName" name="ProductName" autocomplete="off" style="width: 300px;" value="@Model.ProductName" />
         <div id="suggestions" class="suggestion-box"></div>
     </div>
-    <button type="submit" style="margin-left:10px; font-weight:bold; font-family:Comic Sans MS;">
-        Search
-        <img src="/images/search.png" alt="Search" width="25" />
-    </button>
 
-    <button type="button" style="margin-left:10px; font-weight:bold; font-family:Comic Sans MS;" onclick="cleardata()">
-        Clear
-        <img src="/images/clear.png" alt="clear" width="25" />
-    </button>
+    <div style="text-align: right; margin: 20px 50px;">
+        <button type="submit" style="margin-left:10px; font-weight:bold; font-family:Comic Sans MS; border-radius: 15px; padding: 10px;">
+            Search
+            <img src="/images/search.png" alt="Search" width="25" />
+        </button>
 
+        <button type="button" style="margin-left:10px; font-weight:bold; font-family:Comic Sans MS; border-radius: 15px; padding: 10px;" onclick="cleardata()">
+            Clear
+            <img src="/images/clear.png" alt="clear" width="25" />
+        </button>
+    </div>
 </form>
 
 <div style="text-align: right; margin: 20px 50px;">
@@ -134,7 +197,11 @@
         </tr>
     </thead>
     <tbody>
-        @if (Model.AppBoxMarkingTracking != null && Model.AppBoxMarkingTracking.Any())
+        @if (Model.AppBoxMarkingTracking != null && Model.AppBoxMarkingTracking.Any() &&
+           (!string.IsNullOrEmpty(Model.Search) ||
+!string.IsNullOrEmpty(Model.ProductName) ||
+         Model.StartDate.HasValue ||
+         Model.EndDate.HasValue))
         {
             foreach (var item in Model.AppBoxMarkingTracking)
             {
@@ -146,7 +213,10 @@
                 </tr>
             }
         }
-        else
+        else if (!string.IsNullOrEmpty(Model.Search) ||
+         !string.IsNullOrEmpty(Model.ProductName) ||
+         Model.StartDate.HasValue ||
+         Model.EndDate.HasValue)
         {
             <tr>
                 <td colspan="8" style="text-align:center; color:red;">No data found</td>

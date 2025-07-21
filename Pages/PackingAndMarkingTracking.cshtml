@@ -3,9 +3,158 @@
 @{
     ViewData["Title"] = "PackingAndMarkingTracking";
 }
+@section Scripts
+{
+
+    <!-- DownloadExcel -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script>
+        document.getElementById("downloadExcel").addEventListener("click", function () {
+            const table = document.querySelector("table");
+            const worksheet = XLSX.utils.table_to_sheet(table, { raw: true });
+
+            // cell formats
+            const range = XLSX.utils.decode_range(worksheet['!ref']);
+
+            for (let R = range.s.r + 1; R <= range.e.r; ++R) {
+                const mfgCell = worksheet[XLSX.utils.encode_cell({ r: R, c: 0 })]; // MFGNo column
+                if (mfgCell && typeof mfgCell.v === 'number') {
+                    mfgCell.t = 's';
+                    mfgCell.v = mfgCell.v.toString().padStart(6, '0');
+                }
+
+                // TotalInputQty (3), ActualPackQty (4), TotalStock (5), RemainQty (6)
+                for (let C of [3, 4, 5, 6]) {
+                    const cell = worksheet[XLSX.utils.encode_cell({ r: R, c: C })];
+                    if (cell && typeof cell.v === 'string') {
+                        const num = Number(cell.v.replace(/,/g, '')); // remove commas
+                        if (!isNaN(num)) {
+                            cell.t = 'n';
+                            cell.v = num;
+                        }
+                    }
+                }
+            }
+
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "BalancePacking_Data");
+
+            const today = new Date();
+            const yyyy = today.getFullYear();
+            const mm = String(today.getMonth() + 1).padStart(2, '0');
+            const dd = String(today.getDate()).padStart(2, '0');
+            const fileName = `BalancePacking_${yyyy}-${mm}-${dd}.xlsx`;
+
+            XLSX.writeFile(workbook, fileName);
+        });
+    </script>
+    <!--End DownloadExcel -->
+    <script>
+        function cleardata() {
+            console.log("Clear button clicked");
+            document.getElementById("Search").value = "";
+            document.getElementById("ProductName").value = "";
+            document.querySelector("form").submit();
+        }
+
+    </script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const productInput = document.getElementById("ProductName");
+            const suggestionBox = document.getElementById("suggestions");
+            const form = document.getElementById("searchForm");
+
+            productInput.addEventListener("input", function () {
+                const query = this.value;
+
+                if (query.length >= 1) {
+                    fetch(`?handler=SearchProductName&term=${encodeURIComponent(query)}`)
+                        .then(res => res.json())
+                        .then(data => {
+                            let html = "";
+
+                            if (data.length === 0) {
+                                html = "<div class='item'>No Product Name</div>";
+                            } else {
+                                data.forEach(item => {
+                                    html += `<div class="item" data-name="${item.productName}">${item.productName}</div>`;
+                                });
+                            }
+
+                            suggestionBox.innerHTML = html;
+                            suggestionBox.style.display = "block";
+                        });
+                } else {
+                    suggestionBox.style.display = "none";
+                }
+            });
+
+            suggestionBox.addEventListener("click", function (e) {
+                if (e.target && e.target.classList.contains("item")) {
+                    const selectedName = e.target.textContent.trim();
+                    productInput.value = selectedName;
+                    suggestionBox.style.display = "none";
+                }
+            });
+
+            // productInput.addEventListener("blur", function () {
+            //     setTimeout(() => {
+            //         suggestionBox.style.display = "none";
+            //     }, 200);
+            // });
+        });
+    </script>
+}
+
+<style>
+    .suggestion-box {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        border: 1px solid #ccc;
+        background-color: #fff;
+        z-index: 1000;
+        max-height: 200px;
+        overflow-y: auto;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+
+        .suggestion-box .item {
+            padding: 8px 10px;
+            cursor: pointer;
+        }
+
+            .suggestion-box .item:hover {
+                background-color: #f0f0f0;
+            }
+</style>
 <div style="text-align: center; padding-top: 30px;">
-    <h1 style="font-family: Comic Sans MS; color: #33aaff;">Marking Process</h1>
+    <h1 style="font-family: Comic Sans MS; color: #33aaff;">Balance Packing Process</h1>
 </div>
+<p></p>
+<form method="get" style="text-align:center; margin-bottom:20px;">
+
+    <label for="SearchMFG" style="font-weight:bold; font-size:18px;">MFGNo.</label>
+    <input id="Search" name="Search" type="text" value="@Model.Search" style="width: 95px;" />
+
+    <label style="font-weight: bold; font-size: 18px;">ProductName :</label>
+    <div style="position: relative; display: inline-block;">
+        <input type="text" id="ProductName" name="ProductName" autocomplete="off" style="width: 300px;" value="@Model.ProductName" />
+        <div id="suggestions" class="suggestion-box"></div>
+    </div>
+
+    <button type="submit" style="margin-left:10px; font-weight:bold; font-family:Comic Sans MS; border-radius: 15px; padding: 10px;">
+        Search
+        <img src="/images/search.png" alt="Search" width="25" />
+    </button>
+
+    <button type="button" style="margin-left:10px; font-weight:bold; font-family:Comic Sans MS; border-radius: 15px; padding: 10px;" onclick="cleardata()">
+        Clear
+        <img src="/images/clear.png" alt="clear" width="25" />
+    </button>
+
+</form>
 <div style="text-align: right; margin: 20px 50px;">
     <button id="downloadExcel" style="background-color: lightgray; padding: 10px; border-radius: 10px; font-family: Comic Sans MS; border: none; cursor: pointer;">
         <img src="/images/excel.png" width="30" style="vertical-align: middle;" />
@@ -21,17 +170,18 @@
 </style>
 
 
-<table style="width: 95%; margin: auto; border-collapse: collapse; font-family: Comic Sans MS;">
+<table style="width: 95%; margin: auto; border-collapse: collapse; font-family: Comic Sans MS; align-content:center;">
     <thead>
         <tr style="background-color: #e0e0e0;">
-            <th style="border: 1px solid #aaa; padding: 8px;">MFG</th>
-            <th style="border: 1px solid #aaa; padding: 8px;">ProductCode</th>
-            <th style="border: 1px solid #aaa; padding: 8px;">ProductName</th>
-            <th style="border: 1px solid #aaa; padding: 8px;">Qty</th>
-            <th style="border: 1px solid #aaa; padding: 8px;">Actual</th>
-            <th style="border: 1px solid #aaa; padding: 8px;">Remain</th>
-            <th style="border: 1px solid #aaa; padding: 8px;">PackingNo.</th>
-            <th style="border: 1px solid #aaa; padding: 8px;">PackID</th>
+            <th style="border: 1px solid #aaa; padding: 8px;">MFGNo</th>
+            <th style="border: 1px solid #aaa; padding: 8px; width: 180px">ProductCode</th>
+            <th style="border: 1px solid #aaa; padding: 8px; width: 350px">ProductName</th>
+            <th style="border: 1px solid #aaa; padding: 8px;">MarkQty</th>      <!-- Mark -->
+            <th style="border: 1px solid #aaa; padding: 8px;">PackQty</th>      <!-- Pack -->
+            <th style="border: 1px solid #aaa; padding: 8px;">StockQty</th>     <!-- StockInplan -->
+            <th style="border: 1px solid #aaa; padding: 8px;">Remain</th>       <!-- Remain (คงเหลือ) -->
+            <th style="border: 1px solid #aaa; padding: 8px; width:150px">PackingNo.</th>
+            @*<th style="border: 1px solid #aaa; padding: 8px;">PackID</th>*@
         </tr>
     </thead>
     <tbody>
@@ -45,9 +195,10 @@
                     <td style="border: 1px solid #ccc;">@item.ProductName</td>
                     <td style="border: 1px solid #ccc; text-align: center;">@item.TotalInputQty</td>
                     <td style="border: 1px solid #ccc; text-align: center;">@item.ActualPackQty</td>
+                    <td style="border: 1px solid #ccc; text-align: center;">@item.TotalStock</td>
                     <td style="border: 1px solid #ccc; text-align: center;">@item.RemainQty</td>
                     <td style="border: 1px solid #ccc;">@item.PackingNos</td>
-                    <td style="border: 1px solid #ccc;">@item.PackIDs</td>
+                    @*<td style="border: 1px solid #ccc;">@item.PackIDs</td>*@
                 </tr>
             }
         }
@@ -59,4 +210,3 @@
         }
     </tbody>
 </table>
-

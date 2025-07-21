@@ -7,8 +7,9 @@ public class MyDbContext : DbContext
 
     public DbSet<AppBoxProcess> AppBoxProcess { get; set; }
     public DbSet<AppBoxMarkingTracking> AppBoxMarkingTracking { get; set; }
-    public DbSet<ViewPackingList> ViewPaackingList { get; set; }
+    public DbSet<ViewPackingList> ViewPackingList { get; set; }
     public DbSet<ViewPackingAndMarkingTracking> ViewPackingAndMarkingTracking { get; set; }
+    public DbSet<PackingInfo> PackingInfo { get; set; }
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<ViewPackingList>()
@@ -18,6 +19,8 @@ public class MyDbContext : DbContext
         modelBuilder.Entity<ViewPackingAndMarkingTracking>()
             .HasNoKey()
             .ToView("ViewPackingAndMarkingTracking");
+
+        modelBuilder.Entity<PackingInfo>().HasNoKey();
 
         base.OnModelCreating(modelBuilder);
     }
