@@ -20,7 +20,7 @@
                 const mfgCell = worksheet[XLSX.utils.encode_cell({ r: R, c: 0 })]; // MFGNo column
                 if (mfgCell && typeof mfgCell.v === 'number') {
                     mfgCell.t = 's';
-                    mfgCell.v = mfgCell.v.toString().padStart(6, '0');
+                    mfgCell.v = mfgCell.v.toString();
                 }
 
                 // TotalInputQty (3), ActualPackQty (4), TotalStock (5), RemainQty (6)
