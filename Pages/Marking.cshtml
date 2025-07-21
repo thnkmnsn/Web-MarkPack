@@ -20,7 +20,7 @@
                 const mfgCell = worksheet[XLSX.utils.encode_cell({ r: R, c: 0 })];
                 if (mfgCell) {
                     mfgCell.t = 's';
-                    mfgCell.v = mfgCell.v.toString().padStart(6, '0');
+                    mfgCell.v = mfgCell.v.toString();
                 }
 
                 const productNameCell = worksheet[XLSX.utils.encode_cell({ r: R, c: 1 })];
